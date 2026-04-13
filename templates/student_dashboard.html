@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>Welcome, {{ student.name }}</h1>
+                <p class="student-info">Student #: {{ student.student_number }}</p>
+            </div>
+            <a href="/student" class="btn">Logout</a>
+        </div>
+        
+        <!-- RFID Scanner Section -->
+        <div class="section">
+            <h2>Borrow / Return Book</h2>
+            <div class="rfid-scanner">
+                <form id="bookActionForm">
+                    <div class="form-group">
+                        <label>Scan or Enter Book RFID</label>
+                        <input type="text" id="rfid_input" name="rfid_input" 
+                               placeholder="Scan book RFID tag" autofocus>
+                        <input type="hidden" id="student_id" value="{{ student.id }}">
+                    </div>
+                </form>
+                <div id="scanResult" class="message" style="display: none;"></div>
+            </div>
+        </div>
+        
+        <!-- Search Section -->
+        <div class="section">
+            <h2>Search Books</h2>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search by title, author, or language...">
+                <button onclick="searchBooks()" class="btn">Search</button>
+            </div>
+            <div id="searchResults" style="display: none;">
+                <h3>Search Results</h3>
+                <div id="resultsList"></div>
+            </div>
+        </div>
+        
+        <!-- Current Borrowings -->
+        <div class="section">
+            <h2>Your Current Books</h2>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Book Title</th>
+                        <th>Author</th>
+                        <th>Language</th>
+                        <th>Borrowed Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in current_borrowings %}
+                    <tr>
+                        <td>{{ transaction.book.title }}</td>
+                        <td>{{ transaction.book.author }}</td>
+                        <td>{{ transaction.book.language }}</td>
+                        <td>{{ transaction.borrow_date.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        // Handle RFID input for borrowing/returning
+        document.getElementById('rfid_input').addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const rfidUid = e.target.value;
+                const studentId = document.getElementById('student_id').value;
+                
+                try {
+                    const response = await fetch('/api/borrow-book', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            student_id: studentId,
+                            rfid_uid: rfidUid
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    const resultDiv = document.getElementById('scanResult');
+                    
+                    if (response.ok) {
+                        resultDiv.className = 'message success';
+                        resultDiv.textContent = data.message;
+                        resultDiv.style.display = 'block';
+                        
+                        // Reload after 1 second to show updated lists
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        resultDiv.className = 'message error';
+                        resultDiv.textContent = data.message;
+                        resultDiv.style.display = 'block';
+                    }
+                    
+                    document.getElementById('rfid_input').value = '';
+                    
+                    setTimeout(() => {
+                        resultDiv.style.display = 'none';
+                    }, 3000);
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            }
+        });
+        
+        // Search functionality
+        async function searchBooks() {
+            const query = document.getElementById('searchInput').value;
+            
+            if (query.length < 2) {
+                alert('Please enter at least 2 characters to search');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/search-books?q=${encodeURIComponent(query)}`);
+                const books = await response.json();
+                
+                const resultsDiv = document.getElementById('searchResults');
+                const resultsList = document.getElementById('resultsList');
+                
+                if (books.length === 0) {
+                    resultsList.innerHTML = '<p>No books found</p>';
+                } else {
+                    let html = '<div class="book-list">';
+                    books.forEach(book => {
+                        html += `
+                            <div class="book-item">
+                                <h4>${book.title}</h4>
+                                <p>Author: ${book.author}</p>
+                                <p>Language: ${book.language}</p>
+                                <p>Shelf: ${book.shelf_number}</p>
+                                <p class="status ${book.is_available ? 'available' : 'borrowed'}">
+                                    ${book.is_available ? 'Available' : 'Borrowed'}
+                                </p>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    resultsList.innerHTML = html;
+                }
+                
+                resultsDiv.style.display = 'block';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
