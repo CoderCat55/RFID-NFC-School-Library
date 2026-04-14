@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file, session
 from database import db, Student, Book, Transaction
 from werkzeug.utils import secure_filename
 import pandas as pd
 import os
 from datetime import datetime
+from functools import wraps
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here-change-in-production'
@@ -11,20 +12,51 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+# Admin password (hardcoded as requested)
+ADMIN_PASSWORD = '1234'
+
 # Initialize database
 db.init_app(app)
 
 # Create upload folder if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+def admin_required(f):
+    """Decorator to protect admin routes with password"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('admin_authenticated'):
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/')
 def index():
-    """Home page - choose admin or student mode"""
+    """Home page - student access and browse books"""
     return render_template('index.html')
+
+@app.route('/admin-login', methods=['GET', 'POST'])
+def admin_login():
+    """Admin login page"""
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == ADMIN_PASSWORD:
+            session['admin_authenticated'] = True
+            return redirect(url_for('admin_dashboard'))
+        else:
+            flash('Invalid password', 'error')
+    return render_template('admin_login.html')
+
+@app.route('/admin-logout')
+def admin_logout():
+    """Admin logout"""
+    session.pop('admin_authenticated', None)
+    return redirect(url_for('index'))
 
 # ============= ADMIN ROUTES =============
 
 @app.route('/admin')
+@admin_required
 def admin_dashboard():
     """Admin dashboard"""
     # Get current borrowings with eager loading of relationships
@@ -48,6 +80,7 @@ def admin_dashboard():
                          borrowed_books=borrowed_books)
 
 @app.route('/admin/upload-students', methods=['POST'])
+@admin_required
 def upload_students():
     """Upload student list from Excel file"""
     if 'file' not in request.files:
@@ -72,24 +105,19 @@ def upload_students():
             print("Excel columns:", df.columns.tolist())
             
             # Handle different possible column names
-            # Map common variations to expected names
-            column_mapping = {
-                'student_number': ['student_number', 'student number', 'number', 'id', 'student_id', 'school_number', 'school number'],
-                'name': ['name', 'student_name', 'student name', 'full_name', 'full name']
-            }
-            
-            # Find the actual column names in the Excel file
             df_columns_lower = {col.lower(): col for col in df.columns}
             
             student_num_col = None
             name_col = None
             
-            for possible_name in column_mapping['student_number']:
+            # Find student number column
+            for possible_name in ['student_number', 'student number', 'number', 'id', 'student_id', 'school_number', 'school number']:
                 if possible_name in df_columns_lower:
                     student_num_col = df_columns_lower[possible_name]
                     break
                     
-            for possible_name in column_mapping['name']:
+            # Find name column
+            for possible_name in ['name', 'student_name', 'student name', 'full_name', 'full name']:
                 if possible_name in df_columns_lower:
                     name_col = df_columns_lower[possible_name]
                     break
@@ -128,12 +156,14 @@ def upload_students():
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/export-database')
+@admin_required
 def export_database():
     """Export database as SQLite file"""
     db_path = os.path.join(os.getcwd(), 'library.db')
     return send_file(db_path, as_attachment=True, download_name='library_backup.db')
 
 @app.route('/admin/import-database', methods=['POST'])
+@admin_required
 def import_database():
     """Import database file"""
     if 'database' not in request.files:
@@ -167,6 +197,7 @@ def import_database():
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/return-book/<int:transaction_id>')
+@admin_required
 def admin_return_book(transaction_id):
     """Mark a book as returned"""
     transaction = Transaction.query.get_or_404(transaction_id)
@@ -181,11 +212,13 @@ def admin_return_book(transaction_id):
 # ============= BOOK MANAGEMENT ROUTES =============
 
 @app.route('/add-book')
+@admin_required
 def add_book_page():
     """Page for adding books (mobile-friendly)"""
     return render_template('add_book.html')
 
 @app.route('/api/add-book', methods=['POST'])
+@admin_required
 def add_book():
     """API endpoint to add a new book"""
     data = request.json
@@ -235,11 +268,6 @@ def search_books():
     return jsonify(results)
 
 # ============= STUDENT ROUTES =============
-
-@app.route('/student')
-def student_login():
-    """Student login page"""
-    return render_template('student_login.html')
 
 @app.route('/browse')
 def browse_books():

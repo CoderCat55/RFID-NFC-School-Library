@@ -3,34 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Library System</title>
+    <title>School Library System</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>School Library System</h1>
+        <h1>📚 School Library System</h1>
         
-                <div class="menu-grid">
-            <a href="/admin" class="menu-card">
-                <h2>👨‍💼 Administrator</h2>
-                <p>Manage students, books, and view borrowings</p>
-            </a>
-            
-            <a href="/student" class="menu-card">
-                <h2>📚 Student</h2>
-                <p>Borrow and return books</p>
-            </a>
-            
-            <a href="/add-book" class="menu-card">
-                <h2>➕ Add Books</h2>
-                <p>Register new books with RFID tags</p>
-            </a>
-            
-            <a href="/browse" class="menu-card">
-                <h2>🔍 Browse Books</h2>
-                <p>View all books in the library</p>
-            </a>
+        <!-- Student Access Section -->
+        <div class="section">
+            <h2>👨‍🎓 Student Access</h2>
+            <div class="login-container" style="margin: 0; padding: 20px; box-shadow: none;">
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="student_number">Enter Your Student Number</label>
+                        <input type="text" id="student_number" name="student_number" 
+                               required placeholder="Enter your student number" autofocus>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Continue to Dashboard</button>
+                </form>
+                <div id="error" class="message error" style="display: none;"></div>
+            </div>
+        </div>
+        
+        <!-- Browse Books Section -->
+        <div class="section">
+            <h2>🔍 Browse Library Books</h2>
+            <p style="margin-bottom: 20px; color: #666;">Search and view all available books in the library</p>
+            <a href="/browse" class="btn">Browse All Books</a>
+        </div>
+        
+        <!-- Admin Section -->
+        <div class="section">
+            <h2>👨‍💼 Administrator Access</h2>
+            <p style="margin-bottom: 20px; color: #666;">Password protected area for library staff</p>
+            <a href="/admin-login" class="btn">Admin Login</a>
         </div>
     </div>
+    
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const studentNumber = document.getElementById('student_number').value;
+            
+            try {
+                const response = await fetch('/api/verify-student', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ student_number: studentNumber })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    window.location.href = `/student/${data.student_id}`;
+                } else {
+                    const errorDiv = document.getElementById('error');
+                    errorDiv.textContent = data.message;
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred');
+            }
+        });
+    </script>
 </body>
 </html>

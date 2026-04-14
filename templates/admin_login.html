@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Admin Login</h1>
+            <a href="/" class="btn">← Home</a>
+        </div>
+        
+        <div class="login-container">
+            <h2>Enter Admin Password</h2>
+            <form method="POST">
+                <div class="form-group">
+                    <input type="password" id="password" name="password" 
+                           required placeholder="Enter password" autofocus>
+                </div>
+                <button type="submit" class="btn btn-primary">Login</button>
+            </form>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="message {{ category }}" style="margin-top: 20px;">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+</body>
+</html>

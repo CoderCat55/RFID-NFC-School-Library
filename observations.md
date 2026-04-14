@@ -1,2 +1,1 @@
-I add students but It doesnt get processed in the system.
-which file type shoul
+student logout'a basılınca 404 hatası
