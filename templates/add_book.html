@@ -3,90 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
+    <title>Add Book</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Admin Dashboard</h1>
+            <h1>➕ Add New Book</h1>
             <a href="/" class="btn">← Home</a>
         </div>
         
-        <!-- Statistics -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>Total Books</h3>
-                <div class="stat-number">{{ total_books }}</div>
-            </div>
-            <div class="stat-card">
-                <h3>Available Books</h3>
-                <div class="stat-number">{{ available_books }}</div>
-            </div>
-            <div class="stat-card">
-                <h3>Total Students</h3>
-                <div class="stat-number">{{ total_students }}</div>
-            </div>
-            <div class="stat-card">
-                <h3>Borrowed Books</h3>
-                <div class="stat-number">{{ borrowed_books }}</div>
-            </div>
-        </div>
-        
-        <!-- Student Upload Section -->
         <div class="section">
-            <h2>Upload Students</h2>
-            <form action="/admin/upload-students" method="POST" enctype="multipart/form-data">
+            <form id="addBookForm">
                 <div class="form-group">
-                    <label>Excel File (Columns: student_number, name)</label>
-                    <input type="file" name="file" accept=".xlsx,.xls" required>
+                    <label for="rfid_uid">RFID UID *</label>
+                    <input type="text" id="rfid_uid" name="rfid_uid" 
+                           placeholder="Scan or type RFID tag number" required autofocus>
+                    <small>Use your phone's NFC app to read the tag, then copy-paste the UID here</small>
                 </div>
-                <button type="submit" class="btn">Upload Students</button>
+                
+                <div class="form-group">
+                    <label for="title">Book Title *</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="author">Author *</label>
+                    <input type="text" id="author" name="author" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="language">Language *</label>
+                    <select id="language" name="language" required>
+                        <option value="">Select language...</option>
+                        <option value="English">English</option>
+                        <option value="Turkish">Turkish</option>
+                        <option value="Spanish">Spanish</option>
+                        <option value="French">French</option>
+                        <option value="German">German</option>
+                        <option value="Arabic">Arabic</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="shelf_number">Shelf/Location Number *</label>
+                    <input type="text" id="shelf_number" name="shelf_number" 
+                           placeholder="e.g., A-12, Section B Row 3" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Add Book</button>
             </form>
-        </div>
-        
-        <!-- Database Management -->
-        <div class="section">
-            <h2>Database Management</h2>
-            <div class="button-group">
-                <a href="/admin/export-database" class="btn">Export Database</a>
-                <form action="/admin/import-database" method="POST" enctype="multipart/form-data" style="display: inline;">
-                    <input type="file" name="database" accept=".db" required>
-                    <button type="submit" class="btn">Import Database</button>
-                </form>
-            </div>
-        </div>
-        
-        <!-- Current Borrowings -->
-        <div class="section">
-            <h2>Current Borrowings</h2>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Student</th>
-                        <th>Student #</th>
-                        <th>Book Title</th>
-                        <th>Author</th>
-                        <th>Borrowed Date</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for transaction in borrowings %}
-                    <tr>
-                        <td>{{ transaction.student.name }}</td>
-                        <td>{{ transaction.student.student_number }}</td>
-                        <td>{{ transaction.book.title }}</td>
-                        <td>{{ transaction.book.author }}</td>
-                        <td>{{ transaction.borrow_date.strftime('%Y-%m-%d %H:%M') }}</td>
-                        <td>
-                            <a href="/admin/return-book/{{ transaction.id }}" class="btn-small">Return</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            
+            <div id="message" class="message" style="display: none;"></div>
         </div>
     </div>
+    
+    <script>
+        document.getElementById('addBookForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                rfid_uid: document.getElementById('rfid_uid').value.trim(),
+                title: document.getElementById('title').value.trim(),
+                author: document.getElementById('author').value.trim(),
+                language: document.getElementById('language').value,
+                shelf_number: document.getElementById('shelf_number').value.trim()
+            };
+            
+            const messageDiv = document.getElementById('message');
+            
+            try {
+                const response = await fetch('/api/add-book', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    messageDiv.className = 'message success';
+                    messageDiv.textContent = '✅ ' + data.message;
+                    messageDiv.style.display = 'block';
+                    
+                    // Clear form
+                    document.getElementById('addBookForm').reset();
+                    document.getElementById('rfid_uid').focus();
+                } else {
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = '❌ ' + data.message;
+                    messageDiv.style.display = 'block';
+                }
+            } catch (error) {
+                messageDiv.className = 'message error';
+                messageDiv.textContent = '❌ Network error. Please try again.';
+                messageDiv.style.display = 'block';
+                console.error('Error:', error);
+            }
+            
+            // Hide message after 5 seconds
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        });
+    </script>
 </body>
 </html>

@@ -1,3 +1,2 @@
-Admin dasboard has erors
-Student Dashboard should let them also bbrowse the books just not change their info
-Add books html page  is irrelevant
+I add students but It doesnt get processed in the system.
+which file type shoul

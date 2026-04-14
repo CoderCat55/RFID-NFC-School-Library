@@ -21,7 +21,7 @@ class Book(db.Model):
     is_available = db.Column(db.Boolean, default=True)
     
     # Track borrowing history
-    transactions = db.relationship('Transaction', backref='book', lazy='True')
+    transactions = db.relationship('Transaction', backref='book', lazy=True)
 
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)

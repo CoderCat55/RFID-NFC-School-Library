@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
 </head>
 <body>
     <div class="container">
@@ -13,9 +14,11 @@
                 <h1>Welcome, {{ student.name }}</h1>
                 <p class="student-info">Student #: {{ student.student_number }}</p>
             </div>
-            <a href="/student" class="btn">Logout</a>
+            <div style="display: flex; gap: 10px;">
+                <a href="/browse" class="btn">📖 Browse All Books</a>
+                <a href="/student" class="btn">Logout</a>
+            </div>
         </div>
-        
         <!-- RFID Scanner Section -->
         <div class="section">
             <h2>Borrow / Return Book</h2>

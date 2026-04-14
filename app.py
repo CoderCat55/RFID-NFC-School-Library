@@ -27,8 +27,12 @@ def index():
 @app.route('/admin')
 def admin_dashboard():
     """Admin dashboard"""
-    # Get current borrowings
-    current_borrowings = Transaction.query.filter_by(is_returned=False).all()
+    # Get current borrowings with eager loading of relationships
+    current_borrowings = Transaction.query.filter_by(is_returned=False)\
+        .join(Student)\
+        .join(Book)\
+        .options(db.joinedload(Transaction.student), db.joinedload(Transaction.book))\
+        .all()
     
     # Get statistics
     total_books = Book.query.count()
@@ -64,22 +68,59 @@ def upload_students():
             # Read Excel file
             df = pd.read_excel(filepath)
             
-            # Expected columns: 'student_number', 'name'
+            # Debug: print column names to console
+            print("Excel columns:", df.columns.tolist())
+            
+            # Handle different possible column names
+            # Map common variations to expected names
+            column_mapping = {
+                'student_number': ['student_number', 'student number', 'number', 'id', 'student_id', 'school_number', 'school number'],
+                'name': ['name', 'student_name', 'student name', 'full_name', 'full name']
+            }
+            
+            # Find the actual column names in the Excel file
+            df_columns_lower = {col.lower(): col for col in df.columns}
+            
+            student_num_col = None
+            name_col = None
+            
+            for possible_name in column_mapping['student_number']:
+                if possible_name in df_columns_lower:
+                    student_num_col = df_columns_lower[possible_name]
+                    break
+                    
+            for possible_name in column_mapping['name']:
+                if possible_name in df_columns_lower:
+                    name_col = df_columns_lower[possible_name]
+                    break
+            
+            if student_num_col is None or name_col is None:
+                flash(f'Excel must contain columns for student number and name. Found columns: {", ".join(df.columns)}', 'error')
+                return redirect(url_for('admin_dashboard'))
+            
+            success_count = 0
             for _, row in df.iterrows():
-                student = Student.query.filter_by(student_number=str(row['student_number'])).first()
+                # Skip rows with missing data
+                if pd.isna(row[student_num_col]) or pd.isna(row[name_col]):
+                    continue
+                    
+                student = Student.query.filter_by(student_number=str(row[student_num_col])).first()
                 if not student:
                     student = Student(
-                        student_number=str(row['student_number']),
-                        name=row['name']
+                        student_number=str(row[student_num_col]),
+                        name=str(row[name_col])
                     )
                     db.session.add(student)
+                    success_count += 1
             
             db.session.commit()
-            flash(f'Successfully uploaded {len(df)} students', 'success')
+            flash(f'Successfully added {success_count} new students', 'success')
         except Exception as e:
             flash(f'Error uploading file: {str(e)}', 'error')
         finally:
-            os.remove(filepath)  # Clean up uploaded file
+            # Clean up uploaded file
+            if os.path.exists(filepath):
+                os.remove(filepath)
             
     else:
         flash('Please upload an Excel file (.xlsx or .xls)', 'error')
@@ -199,6 +240,39 @@ def search_books():
 def student_login():
     """Student login page"""
     return render_template('student_login.html')
+
+@app.route('/browse')
+def browse_books():
+    """Browse all books page - accessible to anyone"""
+    return render_template('browse.html')
+
+@app.route('/api/all-books')
+def get_all_books():
+    """Get all books with pagination"""
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    books_query = Book.query.order_by(Book.title)
+    books_paginated = books_query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    books = []
+    for book in books_paginated.items:
+        books.append({
+            'id': book.id,
+            'title': book.title,
+            'author': book.author,
+            'language': book.language,
+            'shelf_number': book.shelf_number,
+            'is_available': book.is_available
+        })
+    
+    return jsonify({
+        'books': books,
+        'has_next': books_paginated.has_next,
+        'has_prev': books_paginated.has_prev,
+        'page': page,
+        'total_pages': books_paginated.pages
+    })
 
 @app.route('/api/verify-student', methods=['POST'])
 def verify_student():
